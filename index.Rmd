@@ -19,73 +19,162 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 ## Data Wrangling, Exploration, Visualization
 
-### Name and EID here
+### Bryan Giang
 
 #### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
+For this dataset, I opted to work with data involving the NBA, particularly, player-focused data. This set of data are stats from the 2021-22 season, with very few games having been played. 
+The second dataset involved in this process is a list of each NBA team's salaries. My intention for choosing basketball data relates to my career aspirations. Over the summer, I had
+the pleasure of working with the Dallas Mavericks, and they provided me a diverse set of information that I had the freedom to manipulate and find insights from. Unfortunately, my R and general
+coding skills were not sufficient enough to fully explore all that I would have liked to. However, now having some experience from taking this class, I wanted to go back and explore data that I have
+a lot of familiarity with. I hope in working with NBA data, I can continue to hone my skills and knowledge for what would contribute to a career involving basketball--perhaps something like analytics
+or marketing. Through this data, I hope to find some early trends on different players, teams, and eventually carve out some datasets that answer a large question for me: Who should be getting the big bucks and
+who's overpaid and underpaid?
 
 ```{R}
 # read your datasets in here, e.g., with read_csv()
-
+library(tidyverse)
+player_data <- read_csv("/stor/home/bg26898/2021PlayerData.csv")
+player_data <- player_data
+team_records <- read_csv("/stor/home/bg26898/teamsalary.csv")
+team_records <- team_records
 ```
 
 #### Tidying: Reshaping
 
-If your datasets are tidy already, demonstrate that you can reshape data with pivot wider/longer here (e.g., untidy and then retidy). Alternatively, it may be easier to wait until the wrangling section so you can reshape your summary statistics. Note here if you are going to do this.
 
 ```{R}
-# your tidying code (if applicable; can also wait until wrangling section)
+library(tidyverse)
+library(dplyr)
+
+#renaming the Team column for team_records to have a common variable with player_data
+abrev_team <- team_records %>% mutate(Team = recode(Team, "Chicago Bulls" = "CHI", "Atlanta Hawks" ="ATL", "Boston Celtics" = "BOS", "Brooklyn Nets" = "BRK", "Charlotte Hornets" = "CHO", "Cleveland Cavaliers" = "CLE", "Dallas Mavericks" = "DAL", "Denver Nuggets" = "DEN","Detroit Pistons" = "DET", "Golden State Warriors" = "GSW", "Houston Rockets"="HOU", "Indiana Pacers" = "IND", "Los Angeles Clippers" = "LAC", "Los Angeles Lakers" = "LAL", "Memphis Grizzlies" = "MEM", "Miami Heat" = "MIA", "Milwaukee Bucks" = "MIL", "Minnesota Timberwolves"= "MIN", "New Orleans Pelicans" = "NOP", "New York Knicks" = "NYK", "Oklahoma City Thunder" = "OKC","Orlando Magic" = "ORL", "Philadelphia 76ers" = "PHI", "Phoenix Suns" = "PHO", "Portland Trail Blazers" = "POR", "Sacramento Kings" = "SAC", "San Antonio Spurs" = "SAS", "Toronto Raptors" = "TOR", "Utah Jazz" = "UTA", "Washington Wizards" = "WAS"))
+
+#an example of long and wide pivot since the data was pretty tidy
+long_data <- player_data %>% pivot_longer(cols = c("2P%", "3P%", "FT%"), names_to = "Shooting Splits", values_to = "Percentages")
+long_data %>% pivot_wider(names_from = "Shooting Splits", values_from = "Percentages") %>% relocate("2P%", .after = "2PA") %>% relocate("3P%", .after = "3PA") %>% relocate("FT%", .after = "FTA")
+
+
+#cleaning the rest of the data
+clean_team <- abrev_team %>% select(-c(1, 4:ncol(abrev_team))) %>% na.omit() %>% rename(Team_Salary = 2) %>% mutate(Team_Salary = as.factor(gsub(",", "", Team_Salary))) %>% mutate(Team_Salary = as.numeric(gsub("\\$", " ", Team_Salary)))
+head(clean_team)
+clean_player <- player_data %>% select(-G,-GS) %>% rename("Team" = Tm)
+head(clean_player)
+
+
 ```
 
     
 #### Joining/Merging
 
 ```{R}
-# your joining code
 
-# your joining code
+glimpse(clean_team) #30 observations, 2 variables
+glimpse(clean_player) #403 observations, 28 variables
+joined_data <- left_join(clean_team, clean_player, by = "Team")
+joined_data %>% summarize(n_distinct(Player)) #403 distinct observations
+
+intersect(clean_team$Team, clean_player$Team) %>% length
+anti_join(clean_team, clean_player)#0 rows not in common
+anti_join(clean_player, clean_team) #28 columns not in common, 0 rows 
 ```
 
-Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+First, it's important to mention part of the process for tidying for this project. For the most part, the two datasets I worked with came in Tidy, so I created
+examples of long and wide pivots to demonstrate since it was not necessary for the original data sets. There were some details that needed to be cleaned out, and that
+involved renaming the teams (ex: Atlanta Hawks to ATL) to give common variables between the data sets. The team salaries data had salaries for future seasons, but for this project I just
+needed information for the 2021-22 season and removed the other years. To clean the players data set, I removed some columns that wouldn't play a role in any of the calculations or summaries and renamed a column
+to create common variable names betweent the datasets so that we could join.
+
+The clean_teams set had 30 observations, basically denoting that there are 30 NBA teams, while the clean_player set had 403 observations for the 403 players in the NBA. After a simple left join 
+through the variable "Team", we checked for distinct variables to see if any data was lost or gained, and the result was 403 distinct observations and 403 observations. We further checked this with anti_join and intersect to find 
+rows, columns, and variables that existed between the datasets and those that were varied between the two.
+
 
 ####  Wrangling
 
 ```{R}
-# your wrangling code
+joined_data %>% group_by(Pos) %>% summarize_all(function(x)mean(!is.na(x))) %>% knitr::kable() #computer proportion of NA's by position
+joined_data %>% group_by(Pos) %>% summarize_if(is.numeric, mean, na.rm=T) %>% knitr::kable()#summarized mean of all players by positions
+joined_data %>% group_by(Team, Player) %>% summarize_all(mean, na.rm = T) %>% slice_max(PTS, n = 1) %>% head() %>% knitr::kable()#who is the highest scoring player per team
+joined_data %>% group_by(Team) %>% summarize(mean_age = mean(Age)) %>% slice_min(mean_age, n = 5) %>% knitr::kable() #mean age of each team, let's look at 5 youngest teams
 
-# your wrangling code
 
-# your wrangling code
+#team contribution, how much does each player contribute to their overall team in terms of points, minutes, blocks assist in percentages
+team_data <- joined_data %>% group_by(Team) %>% summarize(team_points = sum(PTS), team_rebounds = sum(TRB), team_blocks = sum(BLK), team_assist = sum(AST), team_minutes = sum(MP)) 
+head(team_data) %>% knitr::kable()
+
+team_contribution <- left_join(joined_data, team_data) %>% group_by(Team, Player) %>% 
+  summarize(average_MP = MP/team_minutes, average_points = PTS/team_points, average_blocks = BLK/team_blocks, average_assist = AST/team_assist, average_rebounds = TRB/team_rebounds) 
+head(team_contribution) %>% knitr::kable()
+
+con <- left_join(team_contribution, clean_team) %>% group_by(Player, Team) %>% mutate(player_con = sum(c_across(average_MP:average_rebounds), na.rm = T))
+head(con) %>% knitr::kable()
+
+calculated_salary <- con %>% group_by(Team, Player, Team_Salary) %>% summarize(total_con = player_con / 5) %>% summarize(calc_salary = total_con * Team_Salary) 
+head(calculated_salary) %>% knitr::kable()
+
+
 ```
 
-Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
-
+For data-wrangling, I created a typical function to compute the proportion of NAs within each statistical category; often there are players who don't attempt a free-throw or 3-pointer and that heavily depends on 
+the position of the player and their role within the team. Centers often are the ones that attempt few free throws and few three-pointers and that's evident from the data.
+This function was just to compute the percentages of those NAs. What really interests me is different computations based on position. I took a summarized mean on each numerical column and grouped by position
+to get a look at the different stats per position. In another future project, we could even look for different correlations through a matrix. I wanted to find the super-star for each team, and
+based it on points scored. The slice_max of 1 was taken for each team for a total of 30 of the biggest scorers in the NBA currently. The mean age was taken for each team, some are obviously very older
+for example the Lakers, who are in contention for the championship will opt for veteran players, while smaller teams like the Thunder, Raptors, and Magic often have young players and focus on development. The most complicated 
+computations were towards the bigger idea I wanted to address for this project. I wanted to see through a quantitative lens, how much each player really contributes to their team and their matching salary worth based on their contributions. I first summed each of the total stats for each team to use as a denominator in the computations. Next, each players stats were fractioned over their total team stats to give us a percentage of their contributions to Points, Rebounds, Assists, Minutes Played, and
+blocks. These 5 percentages were added up to give us the variable Player_Con, or total player contribution, and divided by a total of 5(1.0 for each category), and that final percentage was multiplied by the team's total salary to get
+a projected pay for each player. I saw parallels to the real salaries that players were given, superstars are paid more than role players but the gap between the players are far larger in real life. 
 
 #### Visualizing
 
 ```{R}
-# your plot 1
+joined_data %>% group_by(Team) %>% summarize(mean_age = mean(Age))%>% ggplot(aes(x = Team, y =mean_age)) + 
+  geom_bar(aes(y = mean_age), stat = "summary", fun = mean, color="black", fill = "cadetblue2")  +
+  theme(axis.text.x = element_text(angle=45, hjust=1), legend.position="none") + scale_y_continuous(breaks = seq(5,40,5)) + 
+  ggtitle("Mean Age of Each Team") + xlab("Team") + ylab("Mean Age")
 ```
 
-Your discussion of plot 1
+Plot 1 is a visual of the mean ages calculated earlier. This is the mean age of each of the 30 NBA teams with their players. The most apparent trend, that requires a bit of outside knowledge, 
+is the fact that all the contending NBA championship teams are on the older-end. That includes the LA Lakers, BRK Nets, MIA Heat, MIL Bucks, UTA Jazz, PHO Suns--all teams that had deep playoff
+runs last year. In the NBA, if you're not contending for a championship, you're typically rebuilding, which is denoted by picking up a lot of young talent.
 
 ```{R}
-# your plot 2
+library(ggrepel)
+joined_data %>% ggplot(aes(x=Pos, y = PTS)) + geom_boxplot() + geom_jitter(data = joined_data %>% filter(PTS > 0), alpha=.8) +   
+geom_text_repel(aes(label = ifelse(PTS > quantile(joined_data$PTS, .97, na.rm = T), as.character(Player),"")), nudge_y = 2, segment.size = .3) + theme_minimal() +
+  ggtitle("Top Scorers Based on Position") + xlab("Positions") + ylab("Average Points")
+
+clean_player
+```
+  
 ```
 
-Your discussion of plot 2
+This is a visual representation of something we computed earlier. It's a box plot with each position receiving a box and point distribution of each players PTS, or average points. Some of the
+names shown are the players that fall in the 97th percentile of scoring, highlighting them as some of the best scorers currently in the season. These players have consistently been some of the top
+players in the NBA; the main observatoin is the lack of scorers in the C position. 
 
 ```{R}
 # your plot 3
+clean_player
+top_score <- clean_player %>% slice_max(PTS, n = 5)
+top_pass <- clean_player %>% slice_max(AST, n = 5)
+clean_player %>% filter(PTS > 0 & AST > 0) %>% ggplot(aes(x = PTS, y = AST)) + geom_point() + geom_point(data = top_score, aes(x = PTS, y = AST), color = "blue", size = 2) + 
+  geom_point(data = top_pass, aes(x = PTS, y = AST), color = "blue", size = 2) + geom_text(data = top_score, aes(label= Player),hjust=1) + geom_text(data = top_pass, aes(label= Player),hjust=1) + theme_minimal() +
+  ggtitle("Best Offensive Players of The Season") + xlab("Average Points") + ylab("Average Assists")
+```
+  
+
+
 ```
 
-Your discussion of plot 3
+This final visualization are plot points to find the best offensive players of the season. This doesn't account for position, and takes a few at AST and Scoring as part of the offensive skillset. Very similar
+to the box plot, we see some reoccuring players, however we account for another dimension of the game--passing. The top 5 players are highlighted for each of the stats and named. 
 
 #### Concluding Remarks
 
-If any!
-
+Overall, I better understand how to work with R and for sure understand how intense it is to even get workable and clean data. The process is long and the code is actually fairly short. Knowing
+how to work with basketball will be huge for my career, and this was all something I wish I knew how to do earlier. I hope that these skils will translate to other areas as well.
 
 
 
