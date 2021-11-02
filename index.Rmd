@@ -145,18 +145,17 @@ joined_data %>% ggplot(aes(x=Pos, y = PTS)) + geom_boxplot() + geom_jitter(data 
 geom_text_repel(aes(label = ifelse(PTS > quantile(joined_data$PTS, .97, na.rm = T), as.character(Player),"")), nudge_y = 2, segment.size = .3) + theme_minimal() +
   ggtitle("Top Scorers Based on Position") + xlab("Positions") + ylab("Average Points")
 
-clean_player
 ```
   
-```
+
 
 This is a visual representation of something we computed earlier. It's a box plot with each position receiving a box and point distribution of each players PTS, or average points. Some of the
 names shown are the players that fall in the 97th percentile of scoring, highlighting them as some of the best scorers currently in the season. These players have consistently been some of the top
 players in the NBA; the main observatoin is the lack of scorers in the C position. 
 
+
+
 ```{R}
-# your plot 3
-clean_player
 top_score <- clean_player %>% slice_max(PTS, n = 5)
 top_pass <- clean_player %>% slice_max(AST, n = 5)
 clean_player %>% filter(PTS > 0 & AST > 0) %>% ggplot(aes(x = PTS, y = AST)) + geom_point() + geom_point(data = top_score, aes(x = PTS, y = AST), color = "blue", size = 2) + 
